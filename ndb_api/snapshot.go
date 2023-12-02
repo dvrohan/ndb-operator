@@ -29,7 +29,7 @@ import (
 )
 
 // Fetches all snapshots on the NDB instance and returns a slice of the snapshots
-func GetAllSnapshots(ctx context.Context, ndbClient *ndb_client.NDBClient) (snapshots []SnapshotResponse, err error) {
+func GetAllSnapshots(ctx context.Context, ndbClient *ndb_client.NDBClient) (snapshots []Snapshot, err error) {
 	log := ctrllog.FromContext(ctx)
 	log.Info("Entered ndb_api.GetAllSnapshots")
 	if ndbClient == nil {
@@ -155,7 +155,7 @@ func TakeSnapshot(ctx context.Context, ndbClient *ndb_client.NDBClient, req *Sna
 
 // Deletes a snapshot given a snapshot id
 // Returns the task info summary response for the operation
-func DeleteSnapshot(ctx context.Context, ndbClient *ndb_client.NDBClient, id string) (task TaskInfoSummaryResponse, err error) {
+func DeleteSnapshot(ctx context.Context, ndbClient *ndb_client.NDBClient, ExpireInDays int, ExpiryDateTimezone string) (task TaskInfoSummaryResponse, err error) {
 	log := ctrllog.FromContext(ctx)
 	log.Info("Entered ndb_api.DeleteSnapshot", "SnapshotId", id)
 	if ndbClient == nil {
@@ -163,11 +163,27 @@ func DeleteSnapshot(ctx context.Context, ndbClient *ndb_client.NDBClient, id str
 		log.Error(err, "Received nil ndbClient reference")
 		return
 	}
-	if id == "" {
-		err = fmt.Errorf("id is empty")
-		log.Error(err, "no snapshot id provided")
+
+	snapshots, err := GetAllSnapshots(ctx, ndbClient)
+	if err != nil {
+		log.Error(err, "Error in fetching snapshots")
+	}
+	snapshot_id := ""
+	if len(snapshots) > 0 {
+		for _, snapshot := range snapshots {
+			if snapshot.LcmConfig.ExpiryDetails.ExpireInDays != nil && snapshot.LcmConfig.ExpiryDetails.ExpiryDateTimezone != nil {
+				snapshot_id = snapshot.ID
+			}
+		}
+	}
+
+	if snapshot_id == "" {
+		err = fmt.Errorf("snapshot not found")
+		log.Error(err, "no snapshot found")
 		return
 	}
+	id := snapshot_id
+
 	res, err := ndbClient.Delete("snapshots/"+id, nil)
 	if err != nil || res == nil || res.StatusCode != http.StatusOK {
 		if err == nil {

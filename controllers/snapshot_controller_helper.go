@@ -100,8 +100,11 @@ func (r *SnapshotReconciler) handleDelete(ctx context.Context, snapshot *ndbv1al
 	log.Info("Snapshot CR is being deleted")
 	log.Info(snapshot.ResourceVersion)
 	deleteOperationId := snapshot.Status.OperationID
+	ExpiryDateTimezone := snapshot.Spec.ExpiryDateTimezone
+	ExpireInDays := snapshot.Spec.ExpireInDays
+
 	if deleteOperationId == "" {
-		deleteOp, err := ndb_api.DeleteSnapshot(ctx, ndbClient, snapshot.Status.Id)
+		deleteOp, err := ndb_api.DeleteSnapshot(ctx, ndbClient, ExpireInDays, ExpiryDateTimezone)
 		if err != nil {
 			// Not logging here, already done in the deregister function
 			return requeueOnErr(err)
